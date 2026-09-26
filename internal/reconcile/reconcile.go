@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/fluxa/fluxa/internal/alerting"
@@ -370,7 +369,7 @@ func (s *Service) dispatchWebhook(ctx context.Context, event domain.EventType, t
 // settlement worker can process it. This is used by the admin force-settle
 // endpoint to re-trigger settlement for a stuck transfer without duplicating
 // worker logic.
-func (s *Service) ForceSettle(ctx context.Context, transferID string) error {
+func (s *Service) ForceSettle(ctx context.Context, transferID, actor string) error {
 	payload := map[string]interface{}{
 		"transfer_id": transferID,
 	}
@@ -383,6 +382,19 @@ func (s *Service) ForceSettle(ctx context.Context, transferID string) error {
 
 // ReconcileWallet enqueues a one-off reconciliation task for a wallet. The
 // worker will compare DB balances to Horizon and report any drift.
+func (s *Service) RunWalletReconciliation(ctx context.Context, walletID, actor string) error {
+	return s.ReconcileWallet(ctx, walletID)
+}
+
+func (s *Service) ForceSettleTransfer(ctx context.Context, transferID, actor string) (*domain.Transaction, error) {
+	// Enqueue or execute force settle
+	err := s.ForceSettle(ctx, transferID, actor)
+	if err != nil {
+		return nil, err
+	}
+	return nil, nil
+}
+
 func (s *Service) ReconcileWallet(ctx context.Context, walletID string) error {
 	payload := map[string]interface{}{
 		"wallet_id": walletID,
